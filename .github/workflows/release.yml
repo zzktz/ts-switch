@@ -259,6 +259,10 @@ jobs:
           # Locate bundle artifacts
           TAR_GZ=""; APP_PATH=""
           for path in \
+            "target/universal-apple-darwin/release/bundle/macos" \
+            "target/aarch64-apple-darwin/release/bundle/macos" \
+            "target/x86_64-apple-darwin/release/bundle/macos" \
+            "target/release/bundle/macos" \
             "src-tauri/target/universal-apple-darwin/release/bundle/macos" \
             "src-tauri/target/aarch64-apple-darwin/release/bundle/macos" \
             "src-tauri/target/x86_64-apple-darwin/release/bundle/macos" \
@@ -299,6 +303,10 @@ jobs:
 
           EXISTING_DMG=""
           for path in \
+            "target/universal-apple-darwin/release/bundle/dmg" \
+            "target/aarch64-apple-darwin/release/bundle/dmg" \
+            "target/x86_64-apple-darwin/release/bundle/dmg" \
+            "target/release/bundle/dmg" \
             "src-tauri/target/universal-apple-darwin/release/bundle/dmg" \
             "src-tauri/target/aarch64-apple-darwin/release/bundle/dmg" \
             "src-tauri/target/x86_64-apple-darwin/release/bundle/dmg" \
@@ -395,6 +403,10 @@ jobs:
           # Verify .app (from Tauri bundle)
           APP_PATH=""
           for path in \
+            "target/universal-apple-darwin/release/bundle/macos" \
+            "target/aarch64-apple-darwin/release/bundle/macos" \
+            "target/x86_64-apple-darwin/release/bundle/macos" \
+            "target/release/bundle/macos" \
             "src-tauri/target/universal-apple-darwin/release/bundle/macos" \
             "src-tauri/target/aarch64-apple-darwin/release/bundle/macos" \
             "src-tauri/target/x86_64-apple-darwin/release/bundle/macos" \
@@ -439,9 +451,15 @@ jobs:
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
           $VERSION = $env:GITHUB_REF_NAME  # e.g., v3.5.0
           # 仅打包 MSI 安装器 + .sig（用于 Updater）
-          $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          $msi = Get-ChildItem -Path 'target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $msi) {
+            $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
           if ($null -eq $msi) {
             # 兜底：全局搜索 .msi
+            $msi = Get-ChildItem -Path 'target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if ($null -eq $msi) {
             $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
           }
           if ($null -ne $msi) {
@@ -460,6 +478,7 @@ jobs:
           }
           # 绿色版（portable）：仅可执行文件打 zip（不参与 Updater）
           $exeCandidates = @(
+            'target/release/cc-switch.exe',
             'src-tauri/target/release/cc-switch.exe',
             'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
           )
@@ -491,7 +510,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"  # e.g., v3.5.0
           ARCH="${{ matrix.arch || 'x86_64' }}"
           # Updater artifact: AppImage（含对应 .sig）
-          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
+          APPIMAGE=$(find target/release/bundle src-tauri/target/release/bundle -name "*.AppImage" 2>/dev/null | head -1 || true)
           if [ -n "$APPIMAGE" ]; then
             NEW_APPIMAGE="CC-Switch-${VERSION}-Linux-${ARCH}.AppImage"
             cp "$APPIMAGE" "release-assets/$NEW_APPIMAGE"
@@ -502,7 +521,7 @@ jobs:
             exit 1
           fi
           # 额外上传 .deb（用于手动安装，不参与 Updater）
-          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
+          DEB=$(find target/release/bundle src-tauri/target/release/bundle -name "*.deb" 2>/dev/null | head -1 || true)
           if [ -n "$DEB" ]; then
             cp "$DEB" "release-assets/CC-Switch-${VERSION}-Linux-${ARCH}.deb"
             echo "Deb package copied: CC-Switch-${VERSION}-Linux-${ARCH}.deb"
@@ -510,7 +529,7 @@ jobs:
             echo "No .deb found (optional)"
           fi
           # 额外上传 .rpm（用于 Fedora/RHEL/openSUSE 等，不参与 Updater）
-          RPM=$(find src-tauri/target/release/bundle -name "*.rpm" | head -1 || true)
+          RPM=$(find target/release/bundle src-tauri/target/release/bundle -name "*.rpm" 2>/dev/null | head -1 || true)
           if [ -n "$RPM" ]; then
             cp "$RPM" "release-assets/CC-Switch-${VERSION}-Linux-${ARCH}.rpm"
             echo "RPM package copied: CC-Switch-${VERSION}-Linux-${ARCH}.rpm"
@@ -541,8 +560,8 @@ jobs:
         if: always()
         shell: bash
         run: |
-          echo "Listing bundles in src-tauri/target..."
-          find src-tauri/target -maxdepth 4 -type f -name "*.*" 2>/dev/null || true
+          echo "Listing bundles in target and src-tauri/target..."
+          find target src-tauri/target -maxdepth 4 -type f -name "*.*" 2>/dev/null || true
 
       - name: Clean up Apple signing keychain
         if: runner.os == 'macOS' && always()
