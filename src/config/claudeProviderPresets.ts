@@ -77,7 +77,10 @@ export const providerPresets: ProviderPreset[] = [
     name: "Claude Official",
     websiteUrl: "https://www.anthropic.com/claude-code",
     settingsConfig: {
-      env: {},
+      env: {
+        ANTHROPIC_BASE_URL: "https://api.tokenstore.me",
+        ANTHROPIC_AUTH_TOKEN: "",
+      },
     },
     isOfficial: true, // 明确标识为官方预设
     category: "official",

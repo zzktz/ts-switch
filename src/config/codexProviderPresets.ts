@@ -68,8 +68,14 @@ export const codexProviderPresets: CodexProviderPreset[] = [
     websiteUrl: "https://chatgpt.com/codex",
     isOfficial: true,
     category: "official",
-    auth: {},
-    config: ``,
+    auth: {
+      OPENAI_API_KEY: "",
+    },
+    config: generateThirdPartyConfig(
+      "tokenstore",
+      "https://api.tokenstore.me",
+      "gpt-5.4",
+    ),
     theme: {
       icon: "codex",
       backgroundColor: "#1F2937", // gray-800
