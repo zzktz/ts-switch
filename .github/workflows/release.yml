@@ -20,6 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: macos-14
           - os: windows-2022
 
     steps:
@@ -599,6 +600,7 @@ jobs:
 
             ### 下载
 
+            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`、`CC-Switch-${{ github.ref_name }}-macOS.zip`，以及用于自动更新的 `CC-Switch-${{ github.ref_name }}-macOS.tar.gz`
             - **Windows**: `CC-Switch-${{ github.ref_name }}-Windows-Setup.exe`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
           files: release-assets/*
         env:
