@@ -128,21 +128,7 @@ jobs:
               fi
             fi
           fi
-          # 将“完整两行内容”作为环境变量注入（Tauri 支持传入完整私钥文本或文件路径）
-          # 使用多行写入语法，保持换行以便解析
-          # 将完整两行私钥内容进行 base64 编码，作为单行内容注入环境变量
-          if command -v base64 >/dev/null 2>&1; then
-            KEY_B64=$(base64 < "$KEY_PATH" | tr -d '\r\n')
-          elif command -v openssl >/dev/null 2>&1; then
-            KEY_B64=$(openssl base64 -A -in "$KEY_PATH")
-          else
-            KEY_B64=$(KEY_PATH="$KEY_PATH" node -e "process.stdout.write(require('fs').readFileSync(process.env.KEY_PATH).toString('base64'))")
-          fi
-          if [ -z "$KEY_B64" ]; then
-            echo "❌ 无法生成私钥 base64 内容" >&2
-            exit 1
-          fi
-          echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_B64" >> "$GITHUB_ENV"
+          echo "TAURI_SIGNING_PRIVATE_KEY=$KEY_PATH" >> "$GITHUB_ENV"
           if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
             echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" >> $GITHUB_ENV
           fi
@@ -239,7 +225,14 @@ jobs:
 
       - name: Build Tauri App (Windows)
         if: runner.os == 'Windows'
-        run: pnpm tauri build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${TAURI_SIGNING_ENABLED:-false}" = "true" ]; then
+            pnpm tauri build --bundles nsis
+          else
+            pnpm tauri build --bundles nsis --config src-tauri/tauri.windows.no-updater.conf.json
+          fi
 
       - name: Build Tauri App (Linux)
         if: runner.os == 'Linux'
@@ -447,31 +440,31 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
           $VERSION = $env:GITHUB_REF_NAME  # e.g., v3.5.0
-          # 仅打包 MSI 安装器 + .sig（用于 Updater）
-          $msi = Get-ChildItem -Path 'target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($null -eq $msi) {
-            $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle/msi' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          # 仅打包 NSIS .exe 安装器 + .sig（用于 Updater）
+          $installer = Get-ChildItem -Path 'target/release/bundle/nsis' -Recurse -Include *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $installer) {
+            $installer = Get-ChildItem -Path 'src-tauri/target/release/bundle/nsis' -Recurse -Include *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           }
-          if ($null -eq $msi) {
-            # 兜底：全局搜索 .msi
-            $msi = Get-ChildItem -Path 'target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $installer) {
+            # 兜底：全局搜索 NSIS .exe
+            $installer = Get-ChildItem -Path 'target/release/bundle' -Recurse -Include *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           }
-          if ($null -eq $msi) {
-            $msi = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($null -eq $installer) {
+            $installer = Get-ChildItem -Path 'src-tauri/target/release/bundle' -Recurse -Include *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           }
-          if ($null -ne $msi) {
-            $dest = "CC-Switch-$VERSION-Windows.msi"
-            Copy-Item $msi.FullName (Join-Path release-assets $dest)
+          if ($null -ne $installer) {
+            $dest = "CC-Switch-$VERSION-Windows-Setup.exe"
+            Copy-Item $installer.FullName (Join-Path release-assets $dest)
             Write-Host "Installer copied: $dest"
-            $sigPath = "$($msi.FullName).sig"
+            $sigPath = "$($installer.FullName).sig"
             if (Test-Path $sigPath) {
               Copy-Item $sigPath (Join-Path release-assets ("$dest.sig"))
               Write-Host "Signature copied: $dest.sig"
             } else {
-              Write-Warning "Signature not found for $($msi.Name)"
+              Write-Warning "Signature not found for $($installer.Name)"
             }
           } else {
-            throw 'No Windows MSI installer found'
+            throw 'No Windows NSIS installer found'
           }
           # 绿色版（portable）：仅可执行文件打 zip（不参与 Updater）
           $exeCandidates = @(
@@ -606,7 +599,7 @@ jobs:
 
             ### 下载
 
-            - **Windows**: `CC-Switch-${{ github.ref_name }}-Windows.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
+            - **Windows**: `CC-Switch-${{ github.ref_name }}-Windows-Setup.exe`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
