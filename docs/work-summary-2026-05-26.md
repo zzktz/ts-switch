@@ -69,6 +69,7 @@
 - Apple API Key ID：`93QNL8376M`
 - Apple API Issuer ID：`6e81cd2f-e8e1-4b44-8cfb-e7d944e219fc`
 - 最新验证通过的 tag：`v3.14.1-test16`
+- 最新 x86_64 测试 tag：`v3.14.1-test18`
 
 ## 晚间补充进展
 
@@ -139,3 +140,59 @@
 3. 若目标是“恢复正式 macOS 分发”：
    - 重新开启 `Notarize macOS DMG`
    - 重新开启签名与 notarization 校验
+
+## x86_64 版本补充
+
+### 目标确认
+
+- 当前应用配置的 macOS 最低系统版本仍为 `12.0`
+- 因此 Intel `x86_64` 架构下的 macOS `13.7` 理论上在系统版本层面可运行
+
+### 本次 x86_64 打包调整
+
+为生成明确的 Intel 版本，本次又做了两轮发布流程调整：
+
+1. 将 macOS build 显式改为 `--target x86_64-apple-darwin`
+2. 将 macOS 发布产物文件名显式改为带 `x86_64`
+3. 保留前面已经验证通过的 `no-updater` 降级逻辑
+
+对应提交：
+
+- `b030c61` `ci: package macos intel release build`
+- `94f42c6` `ci: build macos x86 release on available runner`
+
+### 测试过程
+
+1. `v3.14.1-test17`
+   - 方案：切到 `macos-13` runner 直接跑 Intel 主机
+   - 结果：Windows job 正常启动，但 `release (macos-13)` 长时间停留在 GitHub 队列中，未实际进入构建
+2. `v3.14.1-test18`
+   - 方案：切回可快速起跑的 `macos-14` runner，但继续显式构建 `x86_64-apple-darwin`
+   - 结果：macOS job 正常启动并成功通过
+
+### 当前 x86_64 验证结果
+
+`v3.14.1-test18` 对应 workflow run：`26460091106`
+
+已确认：
+
+- `release (macos-14)` 成功
+- `Build Tauri App (macOS)` 成功
+  - started: `2026-05-26T16:08:06Z`
+  - completed: `2026-05-26T16:18:16Z`
+- `Prepare macOS Assets` 成功
+  - started: `2026-05-26T16:18:16Z`
+  - completed: `2026-05-26T16:18:47Z`
+
+截至写入本总结时：
+
+- `release (windows-2022)` 仍在进行中
+- 整体 workflow `26460091106` 仍处于 `in_progress`
+
+### 预期产物命名
+
+若 `test18` 整体 release 最终完成，macOS Intel 产物命名应为：
+
+- `CC-Switch-v3.14.1-test18-macOS-x86_64.dmg`
+- `CC-Switch-v3.14.1-test18-macOS-x86_64.zip`
+- `CC-Switch-v3.14.1-test18-macOS-x86_64.tar.gz`
