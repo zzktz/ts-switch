@@ -206,8 +206,13 @@ jobs:
           set -euo pipefail
           # Build only the app bundle here. The updater tar.gz still comes from
           # createUpdaterArtifacts, and the DMG is created in Prepare macOS Assets.
-          echo "=== macOS app-only signed build ==="
-          pnpm tauri build --bundles app
+          if [ "${TAURI_SIGNING_ENABLED:-false}" = "true" ]; then
+            echo "=== macOS app-only signed build ==="
+            pnpm tauri build --bundles app
+          else
+            echo "=== macOS app-only build without updater signing ==="
+            pnpm tauri build --bundles app --config src-tauri/tauri.macos.no-updater.conf.json
+          fi
           echo "✅ macOS build succeeded"
 
       - name: Build Tauri App (Windows)
