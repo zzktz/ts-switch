@@ -201,10 +201,6 @@ jobs:
         timeout-minutes: 60
         env:
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
         run: |
           set -euo pipefail
           if [ "${APPLE_SIGNING_ENABLED:-false}" = "true" ]; then
@@ -277,11 +273,9 @@ jobs:
           fi
 
           if [ "${APPLE_SIGNING_ENABLED:-false}" = "true" ]; then
-            # Staple notarization ticket to .app (Tauri already notarized it)
-            xcrun stapler staple "$APP_PATH"
-            echo "✅ .app stapled"
+            echo "ℹ️ Signed macOS build detected; app notarization will be handled in the later DMG notarization step"
           else
-            echo "ℹ️ Unsigned macOS build: skip stapling .app"
+            echo "ℹ️ Unsigned macOS build: skip app notarization handling"
           fi
 
           # 1) Collect .tar.gz (updater artifact)
@@ -424,8 +418,7 @@ jobs:
           echo "✅ codesign verification passed"
           spctl -a -t exec -vv "$APP_PATH"
           echo "✅ spctl assessment passed"
-          xcrun stapler validate "$APP_PATH"
-          echo "✅ .app stapler validation passed"
+          echo "ℹ️ Skipping .app stapler validation because notarization is performed on the packaged DMG"
 
           # Verify .dmg (from release-assets/, created by create-dmg + notarized)
           DMG_PATH=$(find release-assets -maxdepth 1 -name "*.dmg" -type f | head -1 || true)
