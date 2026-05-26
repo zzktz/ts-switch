@@ -204,14 +204,10 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          if [ "${APPLE_SIGNING_ENABLED:-false}" = "true" ]; then
-            BUILD_CMD="pnpm tauri build"
-          else
-            BUILD_CMD="pnpm tauri build"
-          fi
-
-          echo "=== macOS single-arch signed build ==="
-          eval "$BUILD_CMD"
+          # Build only the app bundle here. The updater tar.gz still comes from
+          # createUpdaterArtifacts, and the DMG is created in Prepare macOS Assets.
+          echo "=== macOS app-only signed build ==="
+          pnpm tauri build --bundles app
           echo "✅ macOS build succeeded"
 
       - name: Build Tauri App (Windows)
