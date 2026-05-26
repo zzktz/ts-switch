@@ -68,4 +68,74 @@
 - macOS Team ID：`SC25G9G7G7`
 - Apple API Key ID：`93QNL8376M`
 - Apple API Issuer ID：`6e81cd2f-e8e1-4b44-8cfb-e7d944e219fc`
-- 最新用于缩小问题范围的 tag：`v3.14.1-test13`
+- 最新验证通过的 tag：`v3.14.1-test16`
+
+## 晚间补充进展
+
+### 实际排查结果
+
+1. 复核远端后确认：`v3.14.1-test13` 标签存在，但并没有对应的 GitHub Actions workflow run。
+2. 随后补跑了 `v3.14.1-test14`、`v3.14.1-test15`：
+   - 两次都失败在 `Build Tauri App (macOS)`
+   - 失败耗时已从此前的 40 到 60 分钟收敛到约 9 到 10 分钟
+   - 说明新的简化工作流已经生效，但仍有更早的真实错误未解决
+3. 本地复现 `pnpm tauri build --bundles app` 后确认：
+   - 前端构建正常
+   - Rust / Tauri 编译正常
+   - `.app` 与 macOS `.tar.gz` updater artifact 可以产出
+   - 最终失败点为 updater 签名：检测到 updater 公钥，但缺少 `TAURI_SIGNING_PRIVATE_KEY`
+
+### 新确认的根因
+
+- Windows 之所以能继续发布，是因为在缺少 `TAURI_SIGNING_PRIVATE_KEY` 时，会切到 `src-tauri/tauri.windows.no-updater.conf.json`，关闭 updater artifact 继续构建。
+- macOS 之前没有对应的降级分支。
+- 因此 macOS 构建虽然可以完成 `.app` 打包，但会在生成 updater artifact 的签名阶段失败。
+
+### 本次新增修复
+
+1. 将 macOS build 阶段收敛为只构建 `.app`
+2. 在缺少 `TAURI_SIGNING_PRIVATE_KEY` 时，为 macOS 增加 `no-updater` 降级路径
+3. 新增配置文件：`src-tauri/tauri.macos.no-updater.conf.json`
+4. 保留自定义 DMG 生成逻辑，由 `Prepare macOS Assets` 继续产出 `.dmg` 和 `.zip`
+
+对应提交：
+
+- `e423b6f` `ci: build macos app bundle before custom dmg`
+- `47ec8fe` `ci: skip mac updater artifacts when signing key is missing`
+
+### 最终验证结果
+
+- `v3.14.1-test16` 发布流程已在 GitHub Actions 成功跑通
+- workflow run：`26455356840`
+- macOS `Build Tauri App (macOS)` 成功
+- macOS `Prepare macOS Assets` 成功
+- Windows 发布链路同时成功
+- `Publish GitHub Release` 成功
+- `Assemble latest.json` 成功
+
+### 当前已发布产物
+
+`v3.14.1-test16` 已确认发布：
+
+- `CC-Switch-v3.14.1-test16-macOS.dmg`
+- `CC-Switch-v3.14.1-test16-macOS.zip`
+- `CC-Switch-v3.14.1-test16-Windows-Setup.exe`
+- `CC-Switch-v3.14.1-test16-Windows-Portable.zip`
+- `latest.json`
+
+### 当前仍需注意
+
+1. 本次成功的 macOS 发布属于“缺少 updater 私钥时继续发布安装包”的降级路径。
+2. 因此本次未生成 macOS updater 用的 `.tar.gz.sig`，`latest.json` 也不会包含 macOS 自动更新平台条目。
+3. `Notarize macOS DMG` 与 `Verify macOS code signing and notarization` 仍处于临时关闭状态，后续若要恢复正式 macOS 分发质量，还需继续补齐 notarization 流程。
+
+### 下一步建议
+
+1. 若目标是“先可下载使用”，当前 `test16` 已满足。
+2. 若目标是“恢复 macOS 自动更新”：
+   - 补齐有效的 `TAURI_SIGNING_PRIVATE_KEY`
+   - 恢复 macOS updater artifact 与 `.sig`
+   - 验证 `latest.json` 中出现 `darwin-aarch64` / `darwin-x86_64`
+3. 若目标是“恢复正式 macOS 分发”：
+   - 重新开启 `Notarize macOS DMG`
+   - 重新开启签名与 notarization 校验
