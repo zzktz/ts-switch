@@ -153,6 +153,7 @@ jobs:
           fi
 
           echo "APPLE_SIGNING_ENABLED=true" >> "$GITHUB_ENV"
+          echo "APPLE_NOTARIZATION_ENABLED=false" >> "$GITHUB_ENV"
           # Decode .p12 certificate from base64
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
           printf '%s' "${{ secrets.APPLE_CERTIFICATE }}" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
@@ -198,34 +199,20 @@ jobs:
       - name: Build Tauri App (macOS)
         if: runner.os == 'macOS'
         shell: bash
-        timeout-minutes: 60
+        timeout-minutes: 30
         env:
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
           if [ "${APPLE_SIGNING_ENABLED:-false}" = "true" ]; then
-            BUILD_CMD="pnpm tauri build --target universal-apple-darwin"
+            BUILD_CMD="pnpm tauri build"
           else
             BUILD_CMD="pnpm tauri build"
           fi
 
-          max_attempts=3
-          for attempt in $(seq 1 "$max_attempts"); do
-            echo "=== macOS build/notarization attempt ${attempt}/${max_attempts} ==="
-            if eval "$BUILD_CMD"; then
-              echo "✅ macOS build/notarization succeeded"
-              exit 0
-            fi
-
-            if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "❌ macOS build/notarization failed after ${max_attempts} attempts" >&2
-              exit 1
-            fi
-
-            sleep_seconds=$((attempt * 60))
-            echo "⚠️ macOS build/notarization failed, retrying in ${sleep_seconds}s..."
-            sleep "$sleep_seconds"
-          done
+          echo "=== macOS single-arch signed build ==="
+          eval "$BUILD_CMD"
+          echo "✅ macOS build succeeded"
 
       - name: Build Tauri App (Windows)
         if: runner.os == 'Windows'
@@ -345,7 +332,7 @@ jobs:
           fi
 
       - name: Notarize macOS DMG
-        if: runner.os == 'macOS' && env.APPLE_SIGNING_ENABLED == 'true'
+        if: runner.os == 'macOS' && env.APPLE_SIGNING_ENABLED == 'true' && env.APPLE_NOTARIZATION_ENABLED == 'true'
         shell: bash
         timeout-minutes: 30
         env:
@@ -388,7 +375,7 @@ jobs:
           done
 
       - name: Verify macOS code signing and notarization
-        if: runner.os == 'macOS' && env.APPLE_SIGNING_ENABLED == 'true'
+        if: runner.os == 'macOS' && env.APPLE_SIGNING_ENABLED == 'true' && env.APPLE_NOTARIZATION_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
