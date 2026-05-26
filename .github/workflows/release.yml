@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-13
           - os: windows-2022
 
     steps:
@@ -204,14 +204,15 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
+          MACOS_TARGET="x86_64-apple-darwin"
           # Build only the app bundle here. The updater tar.gz still comes from
           # createUpdaterArtifacts, and the DMG is created in Prepare macOS Assets.
           if [ "${TAURI_SIGNING_ENABLED:-false}" = "true" ]; then
-            echo "=== macOS app-only signed build ==="
-            pnpm tauri build --bundles app
+            echo "=== macOS Intel app-only signed build (${MACOS_TARGET}) ==="
+            pnpm tauri build --target "$MACOS_TARGET" --bundles app
           else
-            echo "=== macOS app-only build without updater signing ==="
-            pnpm tauri build --bundles app --config src-tauri/tauri.macos.no-updater.conf.json
+            echo "=== macOS Intel app-only build without updater signing (${MACOS_TARGET}) ==="
+            pnpm tauri build --target "$MACOS_TARGET" --bundles app --config src-tauri/tauri.macos.no-updater.conf.json
           fi
           echo "✅ macOS build succeeded"
 
@@ -237,6 +238,7 @@ jobs:
           set -euxo pipefail
           mkdir -p release-assets
           VERSION="${GITHUB_REF_NAME}"  # e.g., v3.5.0
+          MAC_ARCH="x86_64"
 
           # Locate bundle artifacts
           TAR_GZ=""; APP_PATH=""
@@ -268,7 +270,7 @@ jobs:
 
           # 1) Collect .tar.gz (updater artifact)
           if [ -n "$TAR_GZ" ]; then
-            NEW_TAR_GZ="CC-Switch-${VERSION}-macOS.tar.gz"
+            NEW_TAR_GZ="CC-Switch-${VERSION}-macOS-${MAC_ARCH}.tar.gz"
             cp "$TAR_GZ" "release-assets/$NEW_TAR_GZ"
             [ -f "$TAR_GZ.sig" ] && cp "$TAR_GZ.sig" "release-assets/$NEW_TAR_GZ.sig" || echo ".sig for macOS not found yet"
             echo "macOS updater artifact copied: $NEW_TAR_GZ"
@@ -277,7 +279,7 @@ jobs:
           fi
 
           # 2) Collect .app as zip
-          NEW_ZIP="CC-Switch-${VERSION}-macOS.zip"
+          NEW_ZIP="CC-Switch-${VERSION}-macOS-${MAC_ARCH}.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "release-assets/$NEW_ZIP"
           echo "macOS zip ready: $NEW_ZIP"
 
@@ -303,7 +305,7 @@ jobs:
             fi
 
             HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
-            NEW_DMG="CC-Switch-${VERSION}-macOS.dmg"
+            NEW_DMG="CC-Switch-${VERSION}-macOS-${MAC_ARCH}.dmg"
             DMG_STAGE_DIR="$RUNNER_TEMP/dmg-stage"
             rm -rf "$DMG_STAGE_DIR"
             mkdir -p "$DMG_STAGE_DIR"
@@ -326,7 +328,7 @@ jobs:
             rm -rf "$DMG_STAGE_DIR"
             echo "✅ Styled DMG created: $NEW_DMG"
           elif [ -n "$EXISTING_DMG" ]; then
-            cp "$EXISTING_DMG" "release-assets/CC-Switch-${VERSION}-macOS.dmg"
+            cp "$EXISTING_DMG" "release-assets/CC-Switch-${VERSION}-macOS-${MAC_ARCH}.dmg"
             echo "ℹ️ Copied unsigned/default DMG from Tauri bundle"
           else
             echo "ℹ️ No DMG found for unsigned macOS build"
@@ -589,7 +591,7 @@ jobs:
 
             ### 下载
 
-            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`、`CC-Switch-${{ github.ref_name }}-macOS.zip`，以及用于自动更新的 `CC-Switch-${{ github.ref_name }}-macOS.tar.gz`
+            - **macOS (Intel x86_64)**: `CC-Switch-${{ github.ref_name }}-macOS-x86_64.dmg`、`CC-Switch-${{ github.ref_name }}-macOS-x86_64.zip`，以及用于自动更新的 `CC-Switch-${{ github.ref_name }}-macOS-x86_64.tar.gz`
             - **Windows**: `CC-Switch-${{ github.ref_name }}-Windows-Setup.exe`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
           files: release-assets/*
         env:
