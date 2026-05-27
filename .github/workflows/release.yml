@@ -153,7 +153,7 @@ jobs:
           fi
 
           echo "APPLE_SIGNING_ENABLED=true" >> "$GITHUB_ENV"
-          echo "APPLE_NOTARIZATION_ENABLED=false" >> "$GITHUB_ENV"
+          echo "APPLE_NOTARIZATION_ENABLED=true" >> "$GITHUB_ENV"
           # Decode .p12 certificate from base64
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
           printf '%s' "${{ secrets.APPLE_CERTIFICATE }}" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
