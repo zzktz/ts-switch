@@ -200,6 +200,18 @@ jobs:
           # Cleanup certificate file
           rm -f "$CERT_PATH"
 
+      - name: Verify updater signing key
+        if: env.TAURI_SIGNING_ENABLED == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TEST_FILE="$RUNNER_TEMP/tauri-signing-selftest.txt"
+          printf '%s\n' "tauri signing selftest" > "$TEST_FILE"
+          printf '%s\n' "${TAURI_SIGNING_PRIVATE_KEY:-}" > "$RUNNER_TEMP/tauri-signing-env.txt"
+          pnpm tauri signer sign -f "$RUNNER_TEMP/tauri-signing-env.txt" -p "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" "$TEST_FILE"
+          test -f "$TEST_FILE.sig"
+          echo "✅ updater signing selftest passed"
+
       - name: Build Tauri App (macOS)
         if: runner.os == 'macOS'
         shell: bash
