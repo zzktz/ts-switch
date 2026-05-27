@@ -104,24 +104,23 @@ jobs:
 
           echo "TAURI_SIGNING_ENABLED=true" >> "$GITHUB_ENV"
           RAW="${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}"
-          # 目标：向 Tauri CLI 提供规范化后的私钥“内容”
-          KEY_PATH="$RUNNER_TEMP/tauri_signing.key"
+          # 目标：向 Tauri CLI 提供规范化后的私钥 base64 内容（不包含注释行）
+          KEY_BASE64=""
           # 情况 1：原始两行文本（第一行以 "untrusted comment:" 开头）
           if echo "$RAW" | head -n1 | grep -q '^untrusted comment:'; then
-            printf '%s\n' "$RAW" > "$KEY_PATH"
-            echo "✅ 使用原始两行密钥文件格式"
+            KEY_BASE64="$(printf '%s\n' "$RAW" | sed -n '2p' | tr -d '\r\n')"
+            echo "✅ 使用原始两行密钥，已提取 base64 私钥内容"
           else
             # 情况 2：整体被 base64 包裹（解包后应当是两行）
             if DECODED=$(printf '%s' "$RAW" | (base64 --decode 2>/dev/null || base64 -D 2>/dev/null)) \
                && echo "$DECODED" | head -n1 | grep -q '^untrusted comment:'; then
-              printf '%s\n' "$DECODED" > "$KEY_PATH"
-              echo "✅ 成功解码 base64 包裹密钥，已还原为两行文件"
+              KEY_BASE64="$(printf '%s\n' "$DECODED" | sed -n '2p' | tr -d '\r\n')"
+              echo "✅ 成功解码 base64 包裹密钥，已提取 base64 私钥内容"
             else
-              # 情况 3：已是第二行（纯 Base64 一行）→ 构造两行文件
+              # 情况 3：已是第二行（纯 Base64 一行）
               if echo "$RAW" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
-                ONE=$(printf '%s' "$RAW" | tr -d '\r\n')
-                printf '%s\n%s\n' "untrusted comment: tauri signing key" "$ONE" > "$KEY_PATH"
-                echo "✅ 使用一行 Base64 私钥，已构造两行文件"
+                KEY_BASE64="$(printf '%s' "$RAW" | tr -d '\r\n')"
+                echo "✅ 使用一行 Base64 私钥内容"
               else
                 echo "❌ TAURI_SIGNING_PRIVATE_KEY 格式无法识别：既不是两行原文，也不是其 base64，亦非一行 base64" >&2
                 echo "密钥前10个字符: $(echo "$RAW" | head -c 10)..." >&2
@@ -129,9 +128,15 @@ jobs:
               fi
             fi
           fi
+
+          if ! printf '%s' "$KEY_BASE64" | grep -Eq '^[A-Za-z0-9+/=]+$'; then
+            echo "❌ 归一化后的 Tauri 私钥不是纯 base64 内容" >&2
+            exit 1
+          fi
+
           {
             echo "TAURI_SIGNING_PRIVATE_KEY<<__TAURI_KEY__"
-            cat "$KEY_PATH"
+            printf '%s\n' "$KEY_BASE64"
             echo "__TAURI_KEY__"
           } >> "$GITHUB_ENV"
           if [ -n "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" ]; then
